@@ -100,7 +100,7 @@ def handle_period_left_double_click() -> None:
     pszPeriodDirectory = os.path.join(pszExecutionRoot, "期間")
     pszTargetPath = os.path.join(
         pszPeriodDirectory,
-        "SellGeneralAdminCost_Allocation_Cmd_AccountPeriodRange.txt",
+        "SellGeneralAdminCost_Allocation_Cmd_SelectedRange_And_AccountPeriodRange.txt",
     )
     if not os.path.isfile(pszTargetPath):
         print("Error: ファイルが見つかりません。\n" + pszTargetPath)
@@ -1632,14 +1632,29 @@ def ensure_selected_range_file(pszDirectory: str, objRange: Tuple[Tuple[int, int
     if EXECUTION_ROOT_DIRECTORY:
         pszPeriodDirectory = os.path.join(EXECUTION_ROOT_DIRECTORY, "期間")
         os.makedirs(pszPeriodDirectory, exist_ok=True)
+        pszSelectedRangeCopyPath = os.path.join(pszPeriodDirectory, os.path.basename(pszOutputPath))
+        pszAccountPeriodCopyPath = os.path.join(pszPeriodDirectory, os.path.basename(pszAccountPeriodPath))
         shutil.copy2(
             pszOutputPath,
-            os.path.join(pszPeriodDirectory, os.path.basename(pszOutputPath)),
+            pszSelectedRangeCopyPath,
         )
         shutil.copy2(
             pszAccountPeriodPath,
-            os.path.join(pszPeriodDirectory, os.path.basename(pszAccountPeriodPath)),
+            pszAccountPeriodCopyPath,
         )
+        if os.path.isfile(pszSelectedRangeCopyPath) and os.path.isfile(pszAccountPeriodCopyPath):
+            pszMergedPath = os.path.join(
+                pszPeriodDirectory,
+                "SellGeneralAdminCost_Allocation_Cmd_SelectedRange_And_AccountPeriodRange.txt",
+            )
+            with open(pszSelectedRangeCopyPath, "r", encoding="utf-8") as objFile:
+                pszSelectedRangeText = objFile.read()
+            with open(pszAccountPeriodCopyPath, "r", encoding="utf-8") as objFile:
+                pszAccountPeriodText = objFile.read()
+            with open(pszMergedPath, "w", encoding="utf-8", newline="") as objFile:
+                objFile.write(pszSelectedRangeText)
+                objFile.write("\n")
+                objFile.write(pszAccountPeriodText)
     return pszOutputPath
 
 
