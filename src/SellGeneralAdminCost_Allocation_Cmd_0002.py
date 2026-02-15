@@ -1401,7 +1401,7 @@ def move_cost_report_tsv_files_into_temp_subfolder(pszBaseDirectory: str) -> Non
 
     objPatterns: List[re.Pattern[str]] = [
         re.compile(r"^累計_製造原価報告書_.*\.tsv$"),
-        re.compile(r"^製造原価報告書_\d{4}年\d{2}月_.*\.tsv$"),
+        re.compile(r"^製造原価報告書_.*\.tsv$"),
     ]
     for pszFileName in sorted(os.listdir(pszTempDirectory)):
         if not any(objPattern.match(pszFileName) for objPattern in objPatterns):
