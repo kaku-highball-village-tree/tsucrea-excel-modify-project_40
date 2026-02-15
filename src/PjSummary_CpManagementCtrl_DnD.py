@@ -926,6 +926,10 @@ def move_output_files_to_temp(pszStdOut: str) -> List[str]:
     pszTempDirectory: str = get_temp_output_directory()
     pszCmdDirectory: str = os.path.dirname(__file__)
     objMoved: List[str] = []
+    objCostReportPatterns: List[re.Pattern[str]] = [
+        re.compile(r"^累計_製造原価報告書_.*\.tsv$"),
+        re.compile(r"^製造原価報告書_.*\.tsv$"),
+    ]
     for pszLine in pszStdOut.splitlines():
         pszLineText: str = pszLine.strip()
         if not pszLineText.startswith("Output:"):
@@ -933,10 +937,15 @@ def move_output_files_to_temp(pszStdOut: str) -> List[str]:
         pszOutputPath: str = pszLineText.replace("Output:", "", 1).strip()
         if pszOutputPath == "" or not os.path.isfile(pszOutputPath):
             continue
-        pszTargetPath: str = build_unique_temp_path(pszTempDirectory, os.path.basename(pszOutputPath))
+        pszBaseName: str = os.path.basename(pszOutputPath)
+        pszTargetDirectory: str = pszTempDirectory
+        if any(objPattern.match(pszBaseName) for objPattern in objCostReportPatterns):
+            pszTargetDirectory = os.path.join(pszTempDirectory, "製造原価報告書系")
+            os.makedirs(pszTargetDirectory, exist_ok=True)
+        pszTargetPath: str = build_unique_temp_path(pszTargetDirectory, pszBaseName)
         shutil.move(pszOutputPath, pszTargetPath)
         objMoved.append(pszTargetPath)
-        pszBaseName: str = os.path.basename(pszTargetPath)
+        pszBaseName = os.path.basename(pszTargetPath)
         if pszBaseName.startswith("累計_損益計算書_") or pszBaseName.startswith("累計_製造原価報告書_"):
             pszCopyPath: str = os.path.join(pszCmdDirectory, pszBaseName)
             shutil.copy2(pszTargetPath, pszCopyPath)
