@@ -1358,16 +1358,22 @@ def move_pl_tsv_files_into_income_statement_temp_subfolder(pszBaseDirectory: str
     os.makedirs(pszTargetDirectory, exist_ok=True)
 
     objPattern = re.compile(r"^損益計算書_販管費配賦_.*\.tsv$")
-    for pszFileName in sorted(os.listdir(pszTempDirectory)):
-        if not objPattern.match(pszFileName):
+    objSourceDirectories: List[str] = [pszBaseDirectory, pszTempDirectory]
+    for pszSourceDirectory in objSourceDirectories:
+        if not os.path.isdir(pszSourceDirectory):
             continue
-        pszSourcePath: str = os.path.join(pszTempDirectory, pszFileName)
-        if not os.path.isfile(pszSourcePath):
-            continue
-        pszDestinationPath: str = os.path.join(pszTargetDirectory, pszFileName)
-        if os.path.exists(pszDestinationPath):
-            os.remove(pszDestinationPath)
-        shutil.move(pszSourcePath, pszDestinationPath)
+        for pszFileName in sorted(os.listdir(pszSourceDirectory)):
+            if not objPattern.match(pszFileName):
+                continue
+            pszSourcePath: str = os.path.join(pszSourceDirectory, pszFileName)
+            if not os.path.isfile(pszSourcePath):
+                continue
+            pszDestinationPath: str = os.path.join(pszTargetDirectory, pszFileName)
+            if os.path.abspath(pszSourcePath) == os.path.abspath(pszDestinationPath):
+                continue
+            if os.path.exists(pszDestinationPath):
+                os.remove(pszDestinationPath)
+            shutil.move(pszSourcePath, pszDestinationPath)
 
 
 def move_monthly_income_statement_tsv_files_into_temp_subfolder(pszBaseDirectory: str) -> None:
