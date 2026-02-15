@@ -1354,10 +1354,10 @@ def move_cp_step_tsv_files_to_temp_subfolders(pszBaseDirectory: str) -> None:
 
 def move_pl_tsv_files_into_income_statement_temp_subfolder(pszBaseDirectory: str) -> None:
     pszTempDirectory: str = os.path.join(pszBaseDirectory, "temp")
-    pszTargetDirectory: str = os.path.join(pszTempDirectory, "損益計算書系")
+    pszTargetDirectory: str = os.path.join(pszTempDirectory, "損益計算書_販管費配賦後")
     os.makedirs(pszTargetDirectory, exist_ok=True)
 
-    objPattern = re.compile(r"^損益計算書_\d{4}年\d{2}月.*\.tsv$")
+    objPattern = re.compile(r"^損益計算書_販管費配賦_step.*\.tsv$")
     for pszFileName in sorted(os.listdir(pszTempDirectory)):
         if not objPattern.match(pszFileName):
             continue
