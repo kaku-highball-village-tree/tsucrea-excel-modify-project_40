@@ -334,6 +334,7 @@ def handle_period_left_down() -> None:
         return
     pszPeriodDirectory = os.path.join(pszExecutionRoot, "期間")
     objCandidateFileNames: List[str] = [
+        "SellGeneralAdminCost_Allocation_Cmd_SelectedRange_And_AccountPeriodRange.txt",
         "SellGeneralAdminCost_Allocation_Cmd_SelectedRange.txt",
         "SellGeneralAdminCost_Allocation_DnD_SelectedRange.txt",
     ]
