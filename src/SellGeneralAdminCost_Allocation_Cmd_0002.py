@@ -1352,6 +1352,32 @@ def move_cp_step_tsv_files_to_temp_subfolders(pszBaseDirectory: str) -> None:
             shutil.move(pszSourcePath, pszDestinationPath)
 
 
+def move_step0007_split_files_into_0003_pj_summary_temp_subfolder(pszBaseDirectory: str) -> None:
+    pszTempDirectory: str = os.path.join(pszBaseDirectory, "temp")
+    pszTargetDirectory: str = os.path.join(pszTempDirectory, "0003_PJサマリ")
+    os.makedirs(pszTargetDirectory, exist_ok=True)
+
+    objFileNames: List[str] = [
+        "0003_PJサマリ_step0007_単月_0001.tsv",
+        "0003_PJサマリ_step0007_単月_0002.tsv",
+        "0003_PJサマリ_step0007_単月_0003.tsv",
+        "0003_PJサマリ_step0007_単月_PL_CR.tsv",
+        "0003_PJサマリ_step0007_累計_0001.tsv",
+        "0003_PJサマリ_step0007_累計_0002.tsv",
+        "0003_PJサマリ_step0007_累計_0003.tsv",
+        "0003_PJサマリ_step0007_累計_PL_CR.tsv",
+    ]
+
+    for pszFileName in objFileNames:
+        pszSourcePath: str = os.path.join(pszTempDirectory, pszFileName)
+        if not os.path.isfile(pszSourcePath):
+            continue
+        pszDestinationPath: str = os.path.join(pszTargetDirectory, pszFileName)
+        if os.path.exists(pszDestinationPath):
+            os.remove(pszDestinationPath)
+        shutil.move(pszSourcePath, pszDestinationPath)
+
+
 def move_pj_summary_tsv_files_to_temp_subfolders(pszBaseDirectory: str) -> None:
     pszTempDirectory: str = os.path.join(pszBaseDirectory, "temp")
     os.makedirs(pszTempDirectory, exist_ok=True)
@@ -5178,6 +5204,7 @@ def create_cumulative_reports(pszPlPath: str) -> None:
     copy_cp_management_excels(pszCompanyManagementPath, pszGroupManagementPath)
     create_pj_summary_gross_profit_ranking_excel(pszDirectory)
     create_pj_summary_sales_cost_sg_admin_margin_excel(pszDirectory)
+    move_step0007_split_files_into_0003_pj_summary_temp_subfolder(pszDirectory)
     cleanup_cp_step_intermediate_tsv_files(pszDirectory)
     move_cp_step_tsv_files_to_temp_subfolders(pszDirectory)
     move_pj_summary_tsv_files_to_temp_subfolders(pszDirectory)
