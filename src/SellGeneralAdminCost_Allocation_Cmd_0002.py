@@ -1399,12 +1399,9 @@ def move_cost_report_tsv_files_into_temp_subfolder(pszBaseDirectory: str) -> Non
     pszTargetDirectory: str = os.path.join(pszTempDirectory, "製造原価報告書系")
     os.makedirs(pszTargetDirectory, exist_ok=True)
 
-    objPatterns: List[re.Pattern[str]] = [
-        re.compile(r"^累計_製造原価報告書.*\.tsv$"),
-        re.compile(r"^製造原価報告書_\d{4}年\d{2}月.*\.tsv$"),
-    ]
+    objPattern = re.compile(r"^累計_製造原価報告書_.*\.tsv$")
     for pszFileName in sorted(os.listdir(pszTempDirectory)):
-        if not any(objPattern.match(pszFileName) for objPattern in objPatterns):
+        if not objPattern.match(pszFileName):
             continue
         pszSourcePath: str = os.path.join(pszTempDirectory, pszFileName)
         if not os.path.isfile(pszSourcePath):
