@@ -921,14 +921,15 @@ def build_unique_temp_path(pszDirectory: str, pszFileName: str) -> str:
 
 
 def move_output_files_to_temp(pszStdOut: str) -> List[str]:
-    if pszStdOut.strip() == "":
-        return []
     pszTempDirectory: str = get_temp_output_directory()
     pszCmdDirectory: str = os.path.dirname(__file__)
     objMoved: List[str] = []
     objCostReportPatterns: List[re.Pattern[str]] = [
         re.compile(r"^累計_製造原価報告書_.*\.tsv$"),
         re.compile(r"^製造原価報告書_.*\.tsv$"),
+    ]
+    objIncomeStatementPatterns: List[re.Pattern[str]] = [
+        re.compile(r"^累計_損益計算書_.*\.tsv$"),
     ]
     for pszLine in pszStdOut.splitlines():
         pszLineText: str = pszLine.strip()
@@ -942,11 +943,14 @@ def move_output_files_to_temp(pszStdOut: str) -> List[str]:
         if any(objPattern.match(pszBaseName) for objPattern in objCostReportPatterns):
             pszTargetDirectory = os.path.join(pszTempDirectory, "製造原価報告書系")
             os.makedirs(pszTargetDirectory, exist_ok=True)
+        elif any(objPattern.match(pszBaseName) for objPattern in objIncomeStatementPatterns):
+            pszTargetDirectory = os.path.join(pszTempDirectory, "損益計算書系")
+            os.makedirs(pszTargetDirectory, exist_ok=True)
         pszTargetPath: str = build_unique_temp_path(pszTargetDirectory, pszBaseName)
         shutil.move(pszOutputPath, pszTargetPath)
         objMoved.append(pszTargetPath)
         pszBaseName = os.path.basename(pszTargetPath)
-        if pszBaseName.startswith("累計_損益計算書_") or pszBaseName.startswith("累計_製造原価報告書_"):
+        if pszBaseName.startswith("累計_製造原価報告書_"):
             pszCopyPath: str = os.path.join(pszCmdDirectory, pszBaseName)
             shutil.copy2(pszTargetPath, pszCopyPath)
         if (
@@ -956,6 +960,21 @@ def move_output_files_to_temp(pszStdOut: str) -> List[str]:
         ):
             pszCopyPath: str = os.path.join(pszCmdDirectory, pszBaseName)
             shutil.copy2(pszTargetPath, pszCopyPath)
+
+    pszIncomeStatementDirectory: str = os.path.join(pszTempDirectory, "損益計算書系")
+    os.makedirs(pszIncomeStatementDirectory, exist_ok=True)
+    for pszFileName in sorted(os.listdir(pszTempDirectory)):
+        if not any(objPattern.match(pszFileName) for objPattern in objIncomeStatementPatterns):
+            continue
+        pszSourcePath: str = os.path.join(pszTempDirectory, pszFileName)
+        if not os.path.isfile(pszSourcePath):
+            continue
+        pszDestinationPath: str = os.path.join(pszIncomeStatementDirectory, pszFileName)
+        if os.path.exists(pszDestinationPath):
+            os.remove(pszDestinationPath)
+        shutil.move(pszSourcePath, pszDestinationPath)
+        objMoved.append(pszDestinationPath)
+
     return objMoved
 
 

@@ -1351,6 +1351,34 @@ def move_cp_step_tsv_files_to_temp_subfolders(pszBaseDirectory: str) -> None:
             pszDestinationPath: str = os.path.join(pszTargetDirectory, pszFileName)
             shutil.move(pszSourcePath, pszDestinationPath)
 
+    objStep0004VerticalPatterns: List[Tuple[re.Pattern[str], str]] = [
+        (
+            re.compile(r"^0001_CP別_step0004_(?:単月|累計)_損益計算書_.*_vertical\.tsv$"),
+            "0001_CP別_step0001-0005",
+        ),
+        (
+            re.compile(r"^0002_CP別_step0004_(?:単月|累計)_損益計算書_.*_vertical\.tsv$"),
+            "0002_CP別_step0001-0005",
+        ),
+    ]
+    for pszFileName in sorted(os.listdir(pszTempDirectory)):
+        pszSourcePath: str = os.path.join(pszTempDirectory, pszFileName)
+        if not os.path.isfile(pszSourcePath):
+            continue
+        pszTargetFolderName: Optional[str] = None
+        for objPattern, pszFolderName in objStep0004VerticalPatterns:
+            if objPattern.match(pszFileName):
+                pszTargetFolderName = pszFolderName
+                break
+        if pszTargetFolderName is None:
+            continue
+        pszTargetDirectory = os.path.join(pszTempDirectory, pszTargetFolderName)
+        os.makedirs(pszTargetDirectory, exist_ok=True)
+        pszDestinationPath: str = os.path.join(pszTargetDirectory, pszFileName)
+        if os.path.exists(pszDestinationPath):
+            os.remove(pszDestinationPath)
+        shutil.move(pszSourcePath, pszDestinationPath)
+
 
 def move_pl_tsv_files_into_income_statement_temp_subfolder(pszBaseDirectory: str) -> None:
     pszTempDirectory: str = os.path.join(pszBaseDirectory, "temp")
@@ -1381,9 +1409,12 @@ def move_monthly_income_statement_tsv_files_into_temp_subfolder(pszBaseDirectory
     pszTargetDirectory: str = os.path.join(pszTempDirectory, "損益計算書系")
     os.makedirs(pszTargetDirectory, exist_ok=True)
 
-    objPattern = re.compile(r"^損益計算書_\d{4}年\d{2}月.*\.tsv$")
+    objPatterns: List[re.Pattern[str]] = [
+        re.compile(r"^損益計算書_\d{4}年\d{2}月.*\.tsv$"),
+        re.compile(r"^累計_損益計算書_.*\.tsv$"),
+    ]
     for pszFileName in sorted(os.listdir(pszTempDirectory)):
-        if not objPattern.match(pszFileName):
+        if not any(objPattern.match(pszFileName) for objPattern in objPatterns):
             continue
         pszSourcePath: str = os.path.join(pszTempDirectory, pszFileName)
         if not os.path.isfile(pszSourcePath):
