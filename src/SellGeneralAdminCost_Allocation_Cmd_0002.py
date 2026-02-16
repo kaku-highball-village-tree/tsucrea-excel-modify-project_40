@@ -302,17 +302,49 @@ def format_number(fValue: float) -> str:
     return pszText
 
 
+def find_total_row_index(objRows: List[List[str]]) -> int:
+    for iRowIndex, objRow in enumerate(objRows):
+        pszFirstColumn: str = objRow[0] if objRow else ""
+        if pszFirstColumn == "合計":
+            return iRowIndex
+    return 1
+
+
+def collect_allocation_target_row_indices(objRows: List[List[str]]) -> List[int]:
+    objCompanyPattern = re.compile(r"^C\d{3}(?:_|$)")
+    objProjectPatternP = re.compile(r"^P\d{5}_")
+    objProjectPatternOther = re.compile(r"^(?![CP])[A-Z]\d{3}_")
+
+    iLastCompanyRowIndex: int = -1
+    for iRowIndex in range(1, len(objRows)):
+        objRow = objRows[iRowIndex]
+        pszFirstColumn: str = (objRow[0] if objRow else "").strip()
+        if objCompanyPattern.match(pszFirstColumn):
+            iLastCompanyRowIndex = iRowIndex
+
+    if iLastCompanyRowIndex < 0:
+        return []
+
+    objTargetRowIndices: List[int] = []
+    for iRowIndex in range(iLastCompanyRowIndex + 1, len(objRows)):
+        objRow = objRows[iRowIndex]
+        pszFirstColumn: str = (objRow[0] if objRow else "").strip()
+        if objProjectPatternP.match(pszFirstColumn) or objProjectPatternOther.match(pszFirstColumn):
+            objTargetRowIndices.append(iRowIndex)
+            continue
+        break
+    return objTargetRowIndices
+
+
 def calculate_allocation(
     objRows: List[List[str]],
     iSellGeneralAdminCostColumnIndex: int,
     iAllocationColumnIndex: int,
     iManhourColumnIndex: int,
+    objDeductionCodes: Optional[List[str]] = None,
+    bUseHamiltonRounding: bool = True,
 ) -> None:
-    iRowIndexTotal: int = 1
-    iRowIndexAllocationStart: int = 3
-    iRowIndexAllocationEnd: int = 7
-    iRowIndexProjectStart: int = 10
-    iRowIndexProjectEnd: int = 123
+    iRowIndexTotal: int = find_total_row_index(objRows)
 
     fSellGeneralAdminCostTotal: float = 0.0
     if iRowIndexTotal < len(objRows) and iSellGeneralAdminCostColumnIndex >= 0:
@@ -320,42 +352,203 @@ def calculate_allocation(
         if iSellGeneralAdminCostColumnIndex < len(objRowTotal):
             fSellGeneralAdminCostTotal = parse_number(objRowTotal[iSellGeneralAdminCostColumnIndex])
 
-    fAllocatedSum: float = 0.0
-    for iRowIndex in range(iRowIndexAllocationStart, iRowIndexAllocationEnd + 1):
-        if iRowIndex >= len(objRows):
-            break
-        objRow: List[str] = objRows[iRowIndex]
-        if iAllocationColumnIndex < len(objRow):
-            fAllocatedSum += parse_number(objRow[iAllocationColumnIndex])
+    objDeductionSet = set(objDeductionCodes or [])
+    fDeductionSum: float = 0.0
+    if objDeductionSet:
+        objCompanyPattern = re.compile(r"^C(\d{3})(?:_|$)")
+        for iRowIndex in range(1, len(objRows)):
+            objRow: List[str] = objRows[iRowIndex]
+            pszFirstColumn: str = (objRow[0] if objRow else "").strip()
+            objMatch = objCompanyPattern.match(pszFirstColumn)
+            if objMatch is None:
+                continue
+            pszCode: str = f"C{objMatch.group(1)}"
+            if pszCode not in objDeductionSet:
+                continue
+            if iSellGeneralAdminCostColumnIndex < len(objRow):
+                fDeductionSum += parse_number(objRow[iSellGeneralAdminCostColumnIndex])
 
-    fSellGeneralAdminCostAllocation: float = fSellGeneralAdminCostTotal - fAllocatedSum
+    fSellGeneralAdminCostAllocation: float = fSellGeneralAdminCostTotal - fDeductionSum
 
+    objTargetRowIndices: List[int] = collect_allocation_target_row_indices(objRows)
+    if not objTargetRowIndices:
+        return
+
+    objManhourSeconds: List[float] = []
     fTotalManhours: float = 0.0
-    for iRowIndex in range(iRowIndexProjectStart, iRowIndexProjectEnd + 1):
-        if iRowIndex >= len(objRows):
-            break
+    for iRowIndex in objTargetRowIndices:
         objRow: List[str] = objRows[iRowIndex]
+        fManhourSeconds: float = 0.0
         if iManhourColumnIndex < len(objRow):
-            fTotalManhours += parse_time_to_seconds(objRow[iManhourColumnIndex])
+            fManhourSeconds = parse_time_to_seconds(objRow[iManhourColumnIndex])
+        objManhourSeconds.append(fManhourSeconds)
+        fTotalManhours += fManhourSeconds
 
     if fTotalManhours <= 0.0:
         return
 
-    for iRowIndex in range(iRowIndexProjectStart, iRowIndexProjectEnd + 1):
-        if iRowIndex >= len(objRows):
-            break
-        objRow = objRows[iRowIndex]
-        if iManhourColumnIndex >= len(objRow):
-            continue
-        fManhourSeconds: float = parse_time_to_seconds(objRow[iManhourColumnIndex])
-        fAllocation: float = fSellGeneralAdminCostAllocation * fManhourSeconds / fTotalManhours
-        fAllocation = float(int(round(fAllocation)))
+    objAllocations: List[int] = []
+    if bUseHamiltonRounding:
+        iTargetTotal: int = int(round(fSellGeneralAdminCostAllocation))
+        objRawValues: List[float] = [
+            fSellGeneralAdminCostAllocation * fManhourSeconds / fTotalManhours
+            for fManhourSeconds in objManhourSeconds
+        ]
+        objBaseValues: List[int] = [int(fRawValue // 1) for fRawValue in objRawValues]
+        iRemain: int = iTargetTotal - sum(objBaseValues)
 
+        objRankIndices: List[int] = list(range(len(objTargetRowIndices)))
+        objRankIndices.sort(
+            key=lambda iIndex: (
+                objRawValues[iIndex] - objBaseValues[iIndex],
+                objManhourSeconds[iIndex],
+                -objTargetRowIndices[iIndex],
+            ),
+            reverse=True,
+        )
+
+        if iRemain > 0:
+            for iIndex in objRankIndices[:iRemain]:
+                objBaseValues[iIndex] += 1
+        elif iRemain < 0:
+            objRankIndicesAsc: List[int] = list(reversed(objRankIndices))
+            for iIndex in objRankIndicesAsc[:(-iRemain)]:
+                objBaseValues[iIndex] -= 1
+        objAllocations = objBaseValues
+    else:
+        objAllocations = [
+            int(round(fSellGeneralAdminCostAllocation * fManhourSeconds / fTotalManhours))
+            for fManhourSeconds in objManhourSeconds
+        ]
+
+    for iTargetIndex, iRowIndex in enumerate(objTargetRowIndices):
+        objRow = objRows[iRowIndex]
         if iAllocationColumnIndex >= len(objRow):
             iAppendCount: int = iAllocationColumnIndex + 1 - len(objRow)
             objRow.extend([""] * iAppendCount)
-        objRow[iAllocationColumnIndex] = format_number(fAllocation)
+        objRow[iAllocationColumnIndex] = format_number(float(objAllocations[iTargetIndex]))
         objRows[iRowIndex] = objRow
+
+
+def load_tsv_rows(pszInputPath: str) -> List[List[str]]:
+    objRows: List[List[str]] = []
+    with open(pszInputPath, "r", encoding="utf-8", newline="") as objInputFile:
+        for pszLine in objInputFile:
+            pszLineText: str = pszLine.rstrip("\n").rstrip("\r")
+            objRows.append(pszLineText.split("\t") if pszLineText != "" else [""])
+    return objRows
+
+
+def resolve_step0002_column_indices(objRows: List[List[str]]) -> Tuple[int, int, int]:
+    iSellGeneralAdminCostColumnIndex: int = -1
+    iAllocationColumnIndex: int = -1
+    iManhourColumnIndex: int = -1
+    if objRows:
+        objHeaderRow: List[str] = objRows[0]
+        for iColumnIndex, pszColumnName in enumerate(objHeaderRow):
+            if pszColumnName == "販売費及び一般管理費計":
+                iSellGeneralAdminCostColumnIndex = iColumnIndex
+            elif pszColumnName == "配賦販管費":
+                iAllocationColumnIndex = iColumnIndex
+            elif pszColumnName == "工数":
+                iManhourColumnIndex = iColumnIndex
+    return (
+        iSellGeneralAdminCostColumnIndex,
+        iAllocationColumnIndex,
+        iManhourColumnIndex,
+    )
+
+
+def write_tsv_rows(pszOutputPath: str, objRows: List[List[str]]) -> None:
+    with open(pszOutputPath, "w", encoding="utf-8", newline="") as objOutputFile:
+        for objRow in objRows:
+            objOutputFile.write("\t".join(objRow) + "\n")
+
+
+def build_step0002_variant_path(pszOutputStep0002Path: str, pszSuffix: str) -> str:
+    if pszOutputStep0002Path.lower().endswith(".tsv"):
+        return pszOutputStep0002Path[: -len(".tsv")] + pszSuffix + ".tsv"
+    return pszOutputStep0002Path + pszSuffix + ".tsv"
+
+
+def generate_step0002_variant_from_step0001(
+    pszOutputStep0001Path: str,
+    pszOutputStep0002Path: str,
+    pszSuffix: str,
+    objDeductionCodes: Optional[List[str]],
+    bUseHamiltonRounding: bool,
+) -> None:
+    pszVariantPath: str = build_step0002_variant_path(pszOutputStep0002Path, pszSuffix)
+    objRows: List[List[str]] = load_tsv_rows(pszOutputStep0001Path)
+    (
+        iSellGeneralAdminCostColumnIndex,
+        iAllocationColumnIndex,
+        iManhourColumnIndex,
+    ) = resolve_step0002_column_indices(objRows)
+
+    if iSellGeneralAdminCostColumnIndex >= 0 and iAllocationColumnIndex >= 0 and iManhourColumnIndex >= 0:
+        calculate_allocation(
+            objRows,
+            iSellGeneralAdminCostColumnIndex,
+            iAllocationColumnIndex,
+            iManhourColumnIndex,
+            objDeductionCodes,
+            bUseHamiltonRounding,
+        )
+
+    write_tsv_rows(pszVariantPath, objRows)
+
+
+def generate_step0002_old_output(
+    pszOutputStep0001Path: str,
+    pszOutputStep0002Path: str,
+) -> None:
+    generate_step0002_variant_from_step0001(
+        pszOutputStep0001Path,
+        pszOutputStep0002Path,
+        "_old",
+        ["C001", "C002", "C003", "C004", "C005"],
+        False,
+    )
+
+
+def generate_step0002_total_output(
+    pszOutputStep0001Path: str,
+    pszOutputStep0002Path: str,
+) -> None:
+    generate_step0002_variant_from_step0001(
+        pszOutputStep0001Path,
+        pszOutputStep0002Path,
+        "_合計",
+        [],
+        True,
+    )
+
+
+def generate_step0002_msd3_09_output(
+    pszOutputStep0001Path: str,
+    pszOutputStep0002Path: str,
+) -> None:
+    generate_step0002_variant_from_step0001(
+        pszOutputStep0001Path,
+        pszOutputStep0002Path,
+        "_MSD3_09",
+        ["C001", "C002", "C003", "C004", "C005"],
+        True,
+    )
+
+
+def generate_step0002_msd3_12_output(
+    pszOutputStep0001Path: str,
+    pszOutputStep0002Path: str,
+) -> None:
+    generate_step0002_variant_from_step0001(
+        pszOutputStep0001Path,
+        pszOutputStep0002Path,
+        "_MSD3_12",
+        ["C001", "C002", "C003", "C004", "C005", "C006", "C007"],
+        True,
+    )
 
 
 def recalculate_operating_profit(
@@ -843,18 +1036,11 @@ def process_pl_tsv(
         for objRow in objRows:
             objOutputFile.write("\t".join(objRow) + "\n")
 
-    iSellGeneralAdminCostColumnIndex: int = -1
-    iAllocationColumnIndex: int = -1
-    iManhourColumnIndex: int = -1
-    if objRows:
-        objHeaderRow: List[str] = objRows[0]
-        for iColumnIndex, pszColumnName in enumerate(objHeaderRow):
-            if pszColumnName == "販売費及び一般管理費計":
-                iSellGeneralAdminCostColumnIndex = iColumnIndex
-            elif pszColumnName == "配賦販管費":
-                iAllocationColumnIndex = iColumnIndex
-            elif pszColumnName == "工数":
-                iManhourColumnIndex = iColumnIndex
+    (
+        iSellGeneralAdminCostColumnIndex,
+        iAllocationColumnIndex,
+        iManhourColumnIndex,
+    ) = resolve_step0002_column_indices(objRows)
 
     if iSellGeneralAdminCostColumnIndex >= 0 and iAllocationColumnIndex >= 0 and iManhourColumnIndex >= 0:
         calculate_allocation(
@@ -862,11 +1048,16 @@ def process_pl_tsv(
             iSellGeneralAdminCostColumnIndex,
             iAllocationColumnIndex,
             iManhourColumnIndex,
+            ["C001", "C002", "C003", "C004", "C005"],
+            True,
         )
 
-    with open(pszOutputStep0002Path, "w", encoding="utf-8", newline="") as objOutputFile:
-        for objRow in objRows:
-            objOutputFile.write("\t".join(objRow) + "\n")
+    write_tsv_rows(pszOutputStep0002Path, objRows)
+
+    generate_step0002_old_output(pszOutputStep0001Path, pszOutputStep0002Path)
+    generate_step0002_total_output(pszOutputStep0001Path, pszOutputStep0002Path)
+    generate_step0002_msd3_09_output(pszOutputStep0001Path, pszOutputStep0002Path)
+    generate_step0002_msd3_12_output(pszOutputStep0001Path, pszOutputStep0002Path)
 
     # step0004の処理
     # ここから
