@@ -868,6 +868,51 @@ def process_pl_tsv(
         for objRow in objRows:
             objOutputFile.write("\t".join(objRow) + "\n")
 
+    objAdditionalStep0002Suffixes: List[str] = ["_合計", "_MSD3_09", "_MSD3_12"]
+    for pszSuffix in objAdditionalStep0002Suffixes:
+        pszAdditionalStep0002Path: str
+        if pszOutputStep0002Path.lower().endswith(".tsv"):
+            pszAdditionalStep0002Path = (
+                pszOutputStep0002Path[: -len(".tsv")] + pszSuffix + ".tsv"
+            )
+        else:
+            pszAdditionalStep0002Path = pszOutputStep0002Path + pszSuffix + ".tsv"
+
+        objStep0001Rows: List[List[str]] = []
+        with open(pszOutputStep0001Path, "r", encoding="utf-8", newline="") as objInputFile:
+            for pszLine in objInputFile:
+                pszLineText: str = pszLine.rstrip("\n").rstrip("\r")
+                objStep0001Rows.append(pszLineText.split("\t") if pszLineText != "" else [""])
+
+        iSellGeneralAdminCostColumnIndexAdditional: int = -1
+        iAllocationColumnIndexAdditional: int = -1
+        iManhourColumnIndexAdditional: int = -1
+        if objStep0001Rows:
+            objHeaderRowAdditional: List[str] = objStep0001Rows[0]
+            for iColumnIndex, pszColumnName in enumerate(objHeaderRowAdditional):
+                if pszColumnName == "販売費及び一般管理費計":
+                    iSellGeneralAdminCostColumnIndexAdditional = iColumnIndex
+                elif pszColumnName == "配賦販管費":
+                    iAllocationColumnIndexAdditional = iColumnIndex
+                elif pszColumnName == "工数":
+                    iManhourColumnIndexAdditional = iColumnIndex
+
+        if (
+            iSellGeneralAdminCostColumnIndexAdditional >= 0
+            and iAllocationColumnIndexAdditional >= 0
+            and iManhourColumnIndexAdditional >= 0
+        ):
+            calculate_allocation(
+                objStep0001Rows,
+                iSellGeneralAdminCostColumnIndexAdditional,
+                iAllocationColumnIndexAdditional,
+                iManhourColumnIndexAdditional,
+            )
+
+        with open(pszAdditionalStep0002Path, "w", encoding="utf-8", newline="") as objOutputFile:
+            for objRow in objStep0001Rows:
+                objOutputFile.write("\t".join(objRow) + "\n")
+
     # step0004の処理
     # ここから
     objZeroRows: List[List[str]] = [list(objRow) for objRow in objRows]
