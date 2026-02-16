@@ -788,15 +788,48 @@ def allocate_company_sg_admin_cost(objRows: List[List[str]]) -> List[List[str]]:
         if fTotalSeconds <= 0.0:
             continue
 
+        objTargetRows: List[int] = []
+        objTargetSeconds: List[float] = []
         for iRowIndex, objRow in enumerate(objOutputRows):
             if iRowIndex == 0 or iManhourColumn >= len(objRow) or iCompanyColumn >= len(objRow):
                 continue
             fSeconds = parse_time_to_seconds(objRow[iManhourColumn])
             if fSeconds <= 0.0:
                 continue
-            fAllocation: float = fCompanyTotal * fSeconds / fTotalSeconds
-            fAllocation = float(int(round(fAllocation)))
-            objRow[iCompanyColumn] = format_number(fAllocation)
+            objTargetRows.append(iRowIndex)
+            objTargetSeconds.append(fSeconds)
+
+        if not objTargetRows:
+            continue
+
+        iTargetTotal: int = int(round(fCompanyTotal))
+        objRawValues: List[float] = [
+            fCompanyTotal * fSeconds / fTotalSeconds for fSeconds in objTargetSeconds
+        ]
+        objBaseValues: List[int] = [int(fRawValue // 1) for fRawValue in objRawValues]
+        iRemain: int = iTargetTotal - sum(objBaseValues)
+
+        objRankIndices: List[int] = list(range(len(objTargetRows)))
+        objRankIndices.sort(
+            key=lambda iIndex: (
+                objRawValues[iIndex] - objBaseValues[iIndex],
+                objTargetSeconds[iIndex],
+                -objTargetRows[iIndex],
+            ),
+            reverse=True,
+        )
+
+        if iRemain > 0:
+            for iIndex in objRankIndices[:iRemain]:
+                objBaseValues[iIndex] += 1
+        elif iRemain < 0:
+            objRankIndicesAsc: List[int] = list(reversed(objRankIndices))
+            for iIndex in objRankIndicesAsc[:(-iRemain)]:
+                objBaseValues[iIndex] -= 1
+
+        for iTargetIndex, iRowIndex in enumerate(objTargetRows):
+            objRow = objOutputRows[iRowIndex]
+            objRow[iCompanyColumn] = format_number(float(objBaseValues[iTargetIndex]))
             objOutputRows[iRowIndex] = objRow
 
     return objOutputRows
