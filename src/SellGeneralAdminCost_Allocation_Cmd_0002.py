@@ -311,14 +311,14 @@ def find_total_row_index(objRows: List[List[str]]) -> int:
 
 
 def collect_allocation_target_row_indices(objRows: List[List[str]]) -> List[int]:
-    objCompanyPattern = re.compile(r"^C\d{3}_")
+    objCompanyPattern = re.compile(r"^C\d{3}(?:_|$)")
     objProjectPatternP = re.compile(r"^P\d{5}_")
     objProjectPatternOther = re.compile(r"^(?![CP])[A-Z]\d{3}_")
 
     iLastCompanyRowIndex: int = -1
     for iRowIndex in range(1, len(objRows)):
         objRow = objRows[iRowIndex]
-        pszFirstColumn: str = objRow[0] if objRow else ""
+        pszFirstColumn: str = (objRow[0] if objRow else "").strip()
         if objCompanyPattern.match(pszFirstColumn):
             iLastCompanyRowIndex = iRowIndex
 
@@ -328,7 +328,7 @@ def collect_allocation_target_row_indices(objRows: List[List[str]]) -> List[int]
     objTargetRowIndices: List[int] = []
     for iRowIndex in range(iLastCompanyRowIndex + 1, len(objRows)):
         objRow = objRows[iRowIndex]
-        pszFirstColumn: str = objRow[0] if objRow else ""
+        pszFirstColumn: str = (objRow[0] if objRow else "").strip()
         if objProjectPatternP.match(pszFirstColumn) or objProjectPatternOther.match(pszFirstColumn):
             objTargetRowIndices.append(iRowIndex)
             continue
@@ -355,10 +355,10 @@ def calculate_allocation(
     objDeductionSet = set(objDeductionCodes or [])
     fDeductionSum: float = 0.0
     if objDeductionSet:
-        objCompanyPattern = re.compile(r"^C(\d{3})_")
+        objCompanyPattern = re.compile(r"^C(\d{3})(?:_|$)")
         for iRowIndex in range(1, len(objRows)):
             objRow: List[str] = objRows[iRowIndex]
-            pszFirstColumn: str = objRow[0] if objRow else ""
+            pszFirstColumn: str = (objRow[0] if objRow else "").strip()
             objMatch = objCompanyPattern.match(pszFirstColumn)
             if objMatch is None:
                 continue
@@ -1058,51 +1058,6 @@ def process_pl_tsv(
     generate_step0002_total_output(pszOutputStep0001Path, pszOutputStep0002Path)
     generate_step0002_msd3_09_output(pszOutputStep0001Path, pszOutputStep0002Path)
     generate_step0002_msd3_12_output(pszOutputStep0001Path, pszOutputStep0002Path)
-
-    objAdditionalStep0002Suffixes: List[str] = ["_合計", "_MSD3_09", "_MSD3_12"]
-    for pszSuffix in objAdditionalStep0002Suffixes:
-        pszAdditionalStep0002Path: str
-        if pszOutputStep0002Path.lower().endswith(".tsv"):
-            pszAdditionalStep0002Path = (
-                pszOutputStep0002Path[: -len(".tsv")] + pszSuffix + ".tsv"
-            )
-        else:
-            pszAdditionalStep0002Path = pszOutputStep0002Path + pszSuffix + ".tsv"
-
-        objStep0001Rows: List[List[str]] = []
-        with open(pszOutputStep0001Path, "r", encoding="utf-8", newline="") as objInputFile:
-            for pszLine in objInputFile:
-                pszLineText: str = pszLine.rstrip("\n").rstrip("\r")
-                objStep0001Rows.append(pszLineText.split("\t") if pszLineText != "" else [""])
-
-        iSellGeneralAdminCostColumnIndexAdditional: int = -1
-        iAllocationColumnIndexAdditional: int = -1
-        iManhourColumnIndexAdditional: int = -1
-        if objStep0001Rows:
-            objHeaderRowAdditional: List[str] = objStep0001Rows[0]
-            for iColumnIndex, pszColumnName in enumerate(objHeaderRowAdditional):
-                if pszColumnName == "販売費及び一般管理費計":
-                    iSellGeneralAdminCostColumnIndexAdditional = iColumnIndex
-                elif pszColumnName == "配賦販管費":
-                    iAllocationColumnIndexAdditional = iColumnIndex
-                elif pszColumnName == "工数":
-                    iManhourColumnIndexAdditional = iColumnIndex
-
-        if (
-            iSellGeneralAdminCostColumnIndexAdditional >= 0
-            and iAllocationColumnIndexAdditional >= 0
-            and iManhourColumnIndexAdditional >= 0
-        ):
-            calculate_allocation(
-                objStep0001Rows,
-                iSellGeneralAdminCostColumnIndexAdditional,
-                iAllocationColumnIndexAdditional,
-                iManhourColumnIndexAdditional,
-            )
-
-        with open(pszAdditionalStep0002Path, "w", encoding="utf-8", newline="") as objOutputFile:
-            for objRow in objStep0001Rows:
-                objOutputFile.write("\t".join(objRow) + "\n")
 
     # step0004の処理
     # ここから
