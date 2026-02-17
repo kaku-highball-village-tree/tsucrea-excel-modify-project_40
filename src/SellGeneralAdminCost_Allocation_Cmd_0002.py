@@ -6027,6 +6027,12 @@ def build_step0007_rows_for_cp(
             objRow[5] = "計画比"
     bAllPriorValuesZero: bool = True
     bHasPriorNumericValue: bool = False
+    iCurrentPeriodMonthCount: int = 0
+    iPriorPeriodMonthCount: int = 0
+    if pszPriorRowLabel == "前期":
+        iCurrentPeriodMonthCount = parse_period_month_count(pszCurrentLabel)
+        iPriorPeriodMonthCount = parse_period_month_count(pszPriorLabel)
+
     for objRow in objInsertedRows[2:]:
         pszLabel = objRow[0] if objRow else ""
         if not pszLabel:
@@ -6084,14 +6090,35 @@ def build_step0007_rows_for_cp(
             fActualValueForYoY: float = float(pszTrimmedActualForYoY)
         except ValueError:
             continue
-        if abs(fPriorValueForYoY) < 0.0000001:
+        fPriorValueDenominator: float = fPriorValueForYoY
+        if pszPriorRowLabel == "前期" and iCurrentPeriodMonthCount > 0 and iPriorPeriodMonthCount > 0:
+            fPeriodRatio: float = float(iCurrentPeriodMonthCount) / float(iPriorPeriodMonthCount)
+            fPriorValueDenominator = fPriorValueForYoY * fPeriodRatio
+
+        if abs(fPriorValueDenominator) < 0.0000001:
             if fActualValueForYoY > 0:
                 objRow[4] = "＋∞"
             elif fActualValueForYoY < 0:
                 objRow[4] = "－∞"
             continue
-        objRow[4] = "{0:.2f}".format(fActualValueForYoY / fPriorValueForYoY)
+        objRow[4] = "{0:.4f}".format(fActualValueForYoY / fPriorValueDenominator)
     return objInsertedRows
+
+
+def parse_period_month_count(pszLabel: str) -> int:
+    objRangeMatch = re.match(r"^(\d{4})年(\d{2})月-(\d{4})年(\d{2})月$", (pszLabel or "").strip())
+    if objRangeMatch is not None:
+        iStartYear = int(objRangeMatch.group(1))
+        iStartMonth = int(objRangeMatch.group(2))
+        iEndYear = int(objRangeMatch.group(3))
+        iEndMonth = int(objRangeMatch.group(4))
+        return (iEndYear - iStartYear) * 12 + (iEndMonth - iStartMonth) + 1
+
+    objSingleMatch = re.match(r"^(\d{4})年(\d{2})月$", (pszLabel or "").strip())
+    if objSingleMatch is not None:
+        return 1
+
+    return 0
 
 
 def build_step0006_prior_map(pszPriorPath: str) -> Dict[str, str]:
