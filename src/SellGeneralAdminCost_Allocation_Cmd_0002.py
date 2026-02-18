@@ -5921,6 +5921,15 @@ def create_pj_summary_pl_cr_manhour_excel(
     pszProjectName: str,
     pszInputPath: str,
 ) -> Optional[str]:
+    def parse_h_mm_ss_to_excel_serial(pszTimeText: str) -> Optional[float]:
+        objMatch = re.fullmatch(r"(\d+):(\d{2}):(\d{2})", (pszTimeText or "").strip())
+        if objMatch is None:
+            return None
+        iHours: int = int(objMatch.group(1))
+        iMinutes: int = int(objMatch.group(2))
+        iSeconds: int = int(objMatch.group(3))
+        return (iHours * 3600 + iMinutes * 60 + iSeconds) / 86400.0
+
     objSheetNamePattern = re.compile(r"^(P\d{5}|[A-OQ-Z]\d{3})")
     if not os.path.isfile(pszInputPath):
         return None
@@ -5937,13 +5946,19 @@ def create_pj_summary_pl_cr_manhour_excel(
         objSheet.title = objSheetNameMatch.group(1)
     objRows = read_tsv_rows(pszInputPath)
     for iRowIndex, objRow in enumerate(objRows, start=1):
+        pszRowLabel: str = objRow[0] if len(objRow) >= 1 else ""
         for iColumnIndex, pszValue in enumerate(objRow, start=1):
             objCellValue = parse_tsv_value_for_excel(pszValue)
-            objSheet.cell(
+            objCell = objSheet.cell(
                 row=iRowIndex,
                 column=iColumnIndex,
                 value=objCellValue,
             )
+            if pszRowLabel == "工数行(h:mm:ss)" and iColumnIndex in (2, 5):
+                objExcelTimeSerial = parse_h_mm_ss_to_excel_serial(pszValue)
+                if objExcelTimeSerial is not None:
+                    objCell.value = objExcelTimeSerial
+                    objCell.number_format = "[h]:mm:ss"
     pszTargetDirectory: str = os.path.join(
         pszDirectory,
         "PJサマリ",
