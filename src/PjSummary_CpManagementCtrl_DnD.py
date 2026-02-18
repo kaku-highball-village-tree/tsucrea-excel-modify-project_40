@@ -637,12 +637,19 @@ def handle_pj_income_statement_left_down() -> None:
             "SellGeneralAdminCost_Allocation_DnD",
         )
         return
-    pszSelectedFile = choose_pj_income_statement_file(pszTargetDirectory)
-    if pszSelectedFile is None:
+    objCandidates = [
+        pszName
+        for pszName in os.listdir(pszTargetDirectory)
+        if pszName.startswith("販管費配賦後_損益計算書__") and pszName.endswith(".xlsx")
+    ]
+    if not objCandidates:
         show_error_message_box(
             "Error: ファイルが見つかりません。\n" + pszTargetDirectory,
             "SellGeneralAdminCost_Allocation_DnD",
         )
+        return
+    pszSelectedFile = choose_pj_income_statement_file(pszTargetDirectory)
+    if pszSelectedFile is None:
         return
     os.startfile(os.path.join(pszTargetDirectory, pszSelectedFile))
 
