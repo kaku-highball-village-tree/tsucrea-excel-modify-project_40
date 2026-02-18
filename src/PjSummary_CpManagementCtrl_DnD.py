@@ -76,6 +76,7 @@ BUTTON_LABELS: Tuple[str, ...] = (
     "カンパニー別損益",
     "CP別経営管理表_計上カンパニー",
     "CP別経営管理表_計上グループ",
+    "PJ別損益計算書",
 )
 
 
@@ -532,6 +533,138 @@ def handle_project_pl_right_down() -> None:
     os.startfile(pszProjectDirectory)
 
 
+def choose_pj_income_statement_file(
+    pszTargetDirectory: str,
+) -> Optional[str]:
+    objCandidates = [
+        pszName
+        for pszName in os.listdir(pszTargetDirectory)
+        if pszName.startswith("販管費配賦後_損益計算書__") and pszName.endswith(".xlsx")
+    ]
+    objCandidates.sort()
+    if not objCandidates:
+        return None
+
+    objResult: Dict[str, Optional[str]] = {"file": None}
+
+    def on_select(event: tk.Event) -> None:
+        objSelection = objListBox.curselection()
+        if not objSelection:
+            return
+        objEntryVar.set(objListBox.get(objSelection[0]))
+
+    def on_confirm() -> None:
+        pszFileName = objEntryVar.get().strip()
+        if pszFileName == "":
+            return
+        objResult["file"] = pszFileName
+        objWindow.grab_release()
+        objWindow.destroy()
+
+    def on_cancel() -> None:
+        objWindow.grab_release()
+        objWindow.destroy()
+
+    objWindow = tk.Tk()
+    objWindow.title("PJ別損益計算書: ファイル選択")
+    objWindow.geometry("900x600")
+    objWindow.resizable(True, True)
+    objWindow.attributes("-topmost", True)
+    objWindow.grab_set()
+    objWindow.focus_force()
+    objWindow.lift()
+    objWindow.protocol("WM_DELETE_WINDOW", on_cancel)
+
+    objFrame = tk.Frame(objWindow)
+    objFrame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+    objLabel = tk.Label(
+        objFrame,
+        text="ファイルを一覧から選択してください。",
+        anchor="w",
+    )
+    objLabel.pack(fill=tk.X)
+
+    objListFrame = tk.Frame(objFrame)
+    objListFrame.pack(fill=tk.BOTH, expand=True, pady=5)
+
+    objScrollBar = tk.Scrollbar(objListFrame)
+    objScrollBar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    objListBox = tk.Listbox(
+        objListFrame,
+        yscrollcommand=objScrollBar.set,
+        selectmode=tk.SINGLE,
+    )
+    objListBox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    objScrollBar.config(command=objListBox.yview)
+
+    for pszName in objCandidates:
+        objListBox.insert(tk.END, pszName)
+
+    objListBox.bind("<<ListboxSelect>>", on_select)
+
+    objEntryVar = tk.StringVar()
+    objEntry = tk.Entry(objFrame, textvariable=objEntryVar)
+    objEntry.pack(fill=tk.X, pady=5)
+
+    objButtonFrame = tk.Frame(objFrame)
+    objButtonFrame.pack(fill=tk.X, pady=5)
+
+    objOkButton = tk.Button(objButtonFrame, text="OK", width=12, command=on_confirm)
+    objOkButton.pack(side=tk.RIGHT, padx=5)
+    objCancelButton = tk.Button(
+        objButtonFrame, text="Cancel", width=12, command=on_cancel
+    )
+    objCancelButton.pack(side=tk.RIGHT, padx=5)
+
+    objWindow.mainloop()
+    return objResult["file"]
+
+
+def handle_pj_income_statement_left_down() -> None:
+    pszExecutionRoot = find_latest_execution_root_directory()
+    if pszExecutionRoot is None:
+        show_error_message_box(
+            "Error: 出力フォルダーがまだ作成されていません。",
+            "SellGeneralAdminCost_Allocation_DnD",
+        )
+        return
+    pszTargetDirectory = os.path.join(pszExecutionRoot, "PJ別損益計算書")
+    if not os.path.isdir(pszTargetDirectory):
+        show_error_message_box(
+            "Error: フォルダーが見つかりません。\n" + pszTargetDirectory,
+            "SellGeneralAdminCost_Allocation_DnD",
+        )
+        return
+    pszSelectedFile = choose_pj_income_statement_file(pszTargetDirectory)
+    if pszSelectedFile is None:
+        show_error_message_box(
+            "Error: ファイルが見つかりません。\n" + pszTargetDirectory,
+            "SellGeneralAdminCost_Allocation_DnD",
+        )
+        return
+    os.startfile(os.path.join(pszTargetDirectory, pszSelectedFile))
+
+
+def handle_pj_income_statement_right_down() -> None:
+    pszExecutionRoot = find_latest_execution_root_directory()
+    if pszExecutionRoot is None:
+        show_error_message_box(
+            "Error: 出力フォルダーがまだ作成されていません。",
+            "SellGeneralAdminCost_Allocation_DnD",
+        )
+        return
+    pszTargetDirectory = os.path.join(pszExecutionRoot, "PJ別損益計算書")
+    if not os.path.isdir(pszTargetDirectory):
+        show_error_message_box(
+            "Error: フォルダーが見つかりません。\n" + pszTargetDirectory,
+            "SellGeneralAdminCost_Allocation_DnD",
+        )
+        return
+    os.startfile(pszTargetDirectory)
+
+
 def handle_group_pl_left_down() -> None:
     pszExecutionRoot = find_latest_execution_root_directory()
     if pszExecutionRoot is None:
@@ -819,6 +952,8 @@ def handle_action_button_left_click(iButtonId: int) -> None:
         handle_cp_management_company_left_down()
     elif iButtonId == BUTTON_ID_BASE + 7:
         handle_cp_management_group_left_down()
+    elif iButtonId == BUTTON_ID_BASE + 8:
+        handle_pj_income_statement_left_down()
 
 
 def handle_action_button_right_click(iButtonId: int) -> None:
@@ -838,6 +973,8 @@ def handle_action_button_right_click(iButtonId: int) -> None:
         handle_cp_management_company_right_down()
     elif iButtonId == BUTTON_ID_BASE + 7:
         handle_cp_management_group_right_down()
+    elif iButtonId == BUTTON_ID_BASE + 8:
+        handle_pj_income_statement_right_down()
 
 
 def set_right_button_down_handle(iControlHandle: Optional[int]) -> None:
