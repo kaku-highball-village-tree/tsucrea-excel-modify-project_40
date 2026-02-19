@@ -5921,6 +5921,15 @@ def create_pj_summary_pl_cr_manhour_excel(
     pszProjectName: str,
     pszInputPath: str,
 ) -> Optional[str]:
+    def parse_h_mm_ss_to_excel_serial(pszTimeText: str) -> Optional[float]:
+        objMatch = re.fullmatch(r"(\d+):(\d{2}):(\d{2})", (pszTimeText or "").strip())
+        if objMatch is None:
+            return None
+        iHours: int = int(objMatch.group(1))
+        iMinutes: int = int(objMatch.group(2))
+        iSeconds: int = int(objMatch.group(3))
+        return (iHours * 3600 + iMinutes * 60 + iSeconds) / 86400.0
+
     objSheetNamePattern = re.compile(r"^(P\d{5}|[A-OQ-Z]\d{3})")
     if not os.path.isfile(pszInputPath):
         return None
@@ -5937,13 +5946,19 @@ def create_pj_summary_pl_cr_manhour_excel(
         objSheet.title = objSheetNameMatch.group(1)
     objRows = read_tsv_rows(pszInputPath)
     for iRowIndex, objRow in enumerate(objRows, start=1):
+        pszRowLabel: str = objRow[0] if len(objRow) >= 1 else ""
         for iColumnIndex, pszValue in enumerate(objRow, start=1):
             objCellValue = parse_tsv_value_for_excel(pszValue)
-            objSheet.cell(
+            objCell = objSheet.cell(
                 row=iRowIndex,
                 column=iColumnIndex,
                 value=objCellValue,
             )
+            if pszRowLabel == "工数行(h:mm:ss)" and iColumnIndex in (2, 5):
+                objExcelTimeSerial = parse_h_mm_ss_to_excel_serial(pszValue)
+                if objExcelTimeSerial is not None:
+                    objCell.value = objExcelTimeSerial
+                    objCell.number_format = "[h]:mm:ss"
     pszTargetDirectory: str = os.path.join(
         pszDirectory,
         "PJサマリ",
@@ -5966,6 +5981,124 @@ def create_pj_summary_pl_cr_manhour_excel(
             os.path.join(pszProjectProfitDirectory, os.path.basename(pszOutputPath)),
         )
     return pszOutputPath
+
+
+def create_step0010_pj_income_statement_excel_from_tsv(
+    pszStep0010Path: str,
+) -> Optional[str]:
+    pszBaseName = os.path.basename(pszStep0010Path)
+    objMatch = re.fullmatch(
+        r"損益計算書_販管費配賦_step0010_(\d{4}年\d{2}月)_A∪B_プロジェクト名_C∪D\.tsv",
+        pszBaseName,
+    )
+    if objMatch is None:
+        return None
+    pszYearMonth = objMatch.group(1)
+    pszScriptDirectory: str = os.path.dirname(__file__)
+    pszTemplatePath: str = os.path.join(
+        pszScriptDirectory,
+        f"TEMPLATE_販管費配賦後_損益計算書_{pszYearMonth}_A∪B_プロジェクト名_C∪D.xlsx",
+    )
+    if not os.path.isfile(pszTemplatePath):
+        pszTemplatePath = os.path.join(
+            pszScriptDirectory,
+            "TEMPLATE_販管費配賦後_損益計算書_YYYY年MM月_A∪B_プロジェクト名_C∪D.xlsx",
+        )
+    if not os.path.isfile(pszTemplatePath):
+        return None
+
+    objWorkbook = load_workbook(pszTemplatePath)
+    objSheet = objWorkbook.worksheets[0]
+    objRows = read_tsv_rows(pszStep0010Path)
+    for iRowIndex, objRow in enumerate(objRows, start=1):
+        for iColumnIndex, pszValue in enumerate(objRow, start=1):
+            objCellValue = parse_tsv_value_for_excel(pszValue)
+            objSheet.cell(row=iRowIndex, column=iColumnIndex, value=objCellValue)
+
+    pszOutputPath: str = os.path.join(
+        os.path.dirname(pszStep0010Path),
+        f"販管費配賦後_損益計算書_{pszYearMonth}_A∪B_プロジェクト名_C∪D.xlsx",
+    )
+    objWorkbook.save(pszOutputPath)
+    if EXECUTION_ROOT_DIRECTORY:
+        pszTargetDirectory = os.path.join(EXECUTION_ROOT_DIRECTORY, "PJ別損益計算書")
+        os.makedirs(pszTargetDirectory, exist_ok=True)
+        shutil.copy2(
+            pszOutputPath,
+            os.path.join(pszTargetDirectory, os.path.basename(pszOutputPath)),
+        )
+    return pszOutputPath
+
+
+def create_step0010_pj_income_statement_vertical_excel_from_tsv(
+    pszStep0010VerticalPath: str,
+) -> Optional[str]:
+    pszBaseName = os.path.basename(pszStep0010VerticalPath)
+    objMatch = re.fullmatch(
+        r"損益計算書_販管費配賦_step0010_(\d{4}年\d{2}月)_A∪B_プロジェクト名_C∪D_vertical\.tsv",
+        pszBaseName,
+    )
+    if objMatch is None:
+        return None
+    pszYearMonth = objMatch.group(1)
+    pszScriptDirectory: str = os.path.dirname(__file__)
+    pszTemplatePath: str = os.path.join(
+        pszScriptDirectory,
+        f"TEMPLATE_販管費配賦後_損益計算書_{pszYearMonth}_A∪B_プロジェクト名_C∪D_vertical.xlsx",
+    )
+    if not os.path.isfile(pszTemplatePath):
+        pszTemplatePath = os.path.join(
+            pszScriptDirectory,
+            "TEMPLATE_販管費配賦後_損益計算書_YYYY年MM月_A∪B_プロジェクト名_C∪D_vertical.xlsx",
+        )
+    if not os.path.isfile(pszTemplatePath):
+        return None
+
+    objWorkbook = load_workbook(pszTemplatePath)
+    objSheet = objWorkbook.worksheets[0]
+    objRows = read_tsv_rows(pszStep0010VerticalPath)
+    for iRowIndex, objRow in enumerate(objRows, start=1):
+        for iColumnIndex, pszValue in enumerate(objRow, start=1):
+            objCellValue = parse_tsv_value_for_excel(pszValue)
+            objSheet.cell(row=iRowIndex, column=iColumnIndex, value=objCellValue)
+
+    pszOutputPath: str = os.path.join(
+        os.path.dirname(pszStep0010VerticalPath),
+        f"販管費配賦後_損益計算書_{pszYearMonth}_A∪B_プロジェクト名_C∪D_vertical.xlsx",
+    )
+    objWorkbook.save(pszOutputPath)
+    if EXECUTION_ROOT_DIRECTORY:
+        pszTargetDirectory = os.path.join(EXECUTION_ROOT_DIRECTORY, "PJ別損益計算書")
+        os.makedirs(pszTargetDirectory, exist_ok=True)
+        shutil.copy2(
+            pszOutputPath,
+            os.path.join(pszTargetDirectory, os.path.basename(pszOutputPath)),
+        )
+    return pszOutputPath
+
+
+def create_step0010_pj_income_statement_excels(pszDirectory: str) -> List[str]:
+    objOutputs: List[str] = []
+    for pszName in sorted(os.listdir(pszDirectory)):
+        pszPath = os.path.join(pszDirectory, pszName)
+        if not os.path.isfile(pszPath):
+            continue
+        if re.fullmatch(
+            r"損益計算書_販管費配賦_step0010_\d{4}年\d{2}月_A∪B_プロジェクト名_C∪D\.tsv",
+            pszName,
+        ) is not None:
+            pszOutput = create_step0010_pj_income_statement_excel_from_tsv(pszPath)
+            if pszOutput is not None:
+                objOutputs.append(pszOutput)
+            continue
+        if re.fullmatch(
+            r"損益計算書_販管費配賦_step0010_\d{4}年\d{2}月_A∪B_プロジェクト名_C∪D_vertical\.tsv",
+            pszName,
+        ) is not None:
+            pszOutput = create_step0010_pj_income_statement_vertical_excel_from_tsv(pszPath)
+            if pszOutput is not None:
+                objOutputs.append(pszOutput)
+    return objOutputs
 
 
 def reorder_cp_step0006_rows(objRows: List[List[str]]) -> List[List[str]]:
@@ -7193,6 +7326,7 @@ def main(argv: list[str]) -> int:
         print(f"Output: {pszOutputFinalPath}")
 
     if objPairs:
+        create_step0010_pj_income_statement_excels(get_script_base_directory())
         create_cumulative_reports(objPairs[0][1])
     return 0
 
