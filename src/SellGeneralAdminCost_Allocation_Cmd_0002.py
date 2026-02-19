@@ -3815,6 +3815,30 @@ def insert_per_hour_rows(
     objOutputRows.insert(iInsertIndex, objSalesPerHourRow)
     objOutputRows.insert(iInsertIndex + 1, objOperatingPerHourRow)
     objOutputRows.insert(iInsertIndex + 2, objManhourHmsRow)
+
+    objTargetColumnNames: List[str] = [
+        "配賦販管費",
+        "1Cカンパニー販管費",
+        "2Cカンパニー販管費",
+        "3Cカンパニー販管費",
+        "4Cカンパニー販管費",
+        "事業開発カンパニー販管費",
+    ]
+    if len(objOutputRows) >= 2:
+        objHeaderRow: List[str] = objOutputRows[0]
+        objTotalRow: List[str] = objOutputRows[1]
+        for pszColumnName in objTargetColumnNames:
+            iColumnIndex: int = find_column_index(objHeaderRow, pszColumnName)
+            if iColumnIndex < 0:
+                continue
+            if len(objTotalRow) <= iColumnIndex:
+                objTotalRow.extend([""] * (iColumnIndex + 1 - len(objTotalRow)))
+            fTotalValue: float = 0.0
+            for objRow in objOutputRows[2:]:
+                if iColumnIndex < len(objRow):
+                    fTotalValue += parse_number(objRow[iColumnIndex])
+            objTotalRow[iColumnIndex] = format_number(fTotalValue)
+
     return objOutputRows
 
 
