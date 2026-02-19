@@ -6017,7 +6017,7 @@ def create_step0010_pj_income_statement_excel_from_tsv(
 
     pszOutputPath: str = os.path.join(
         os.path.dirname(pszStep0010Path),
-        f"販管費配賦後_損益計算書__{pszYearMonth}_A∪B_プロジェクト名_C∪D.xlsx",
+        f"販管費配賦後_損益計算書_{pszYearMonth}_A∪B_プロジェクト名_C∪D.xlsx",
     )
     objWorkbook.save(pszOutputPath)
     if EXECUTION_ROOT_DIRECTORY:
@@ -6064,7 +6064,7 @@ def create_step0010_pj_income_statement_vertical_excel_from_tsv(
 
     pszOutputPath: str = os.path.join(
         os.path.dirname(pszStep0010VerticalPath),
-        f"販管費配賦後_損益計算書__{pszYearMonth}_A∪B_プロジェクト名_C∪D_vertical.xlsx",
+        f"販管費配賦後_損益計算書_{pszYearMonth}_A∪B_プロジェクト名_C∪D_vertical.xlsx",
     )
     objWorkbook.save(pszOutputPath)
     if EXECUTION_ROOT_DIRECTORY:
