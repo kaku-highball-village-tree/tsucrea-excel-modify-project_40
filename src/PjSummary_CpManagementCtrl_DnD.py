@@ -640,7 +640,7 @@ def handle_pj_income_statement_left_down() -> None:
     objCandidates = [
         pszName
         for pszName in os.listdir(pszTargetDirectory)
-        if pszName.startswith("販管費配賦後_損益計算書__") and pszName.endswith(".xlsx")
+        if pszName.startswith("販管費配賦後_損益計算書_") and pszName.endswith(".xlsx")
     ]
     if not objCandidates:
         show_error_message_box(
