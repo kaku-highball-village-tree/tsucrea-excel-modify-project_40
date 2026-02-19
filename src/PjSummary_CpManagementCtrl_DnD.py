@@ -65,7 +65,7 @@ g_action_button_brush_handle: Optional[int] = None
 g_default_gui_font_handle: Optional[int] = None
 g_right_button_down_handle: Optional[int] = None
 g_main_window_handle: Optional[int] = None
-ACTION_BUTTON_COLOR = (0xFF, 0xE3, 0xB3)
+ACTION_BUTTON_COLOR = (0xC0, 0xE8, 0xFF)
 
 BUTTON_LABELS: Tuple[str, ...] = (
     "期間",
